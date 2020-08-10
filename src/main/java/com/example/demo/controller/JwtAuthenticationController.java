@@ -3,6 +3,7 @@ package com.example.demo.controller;
 import java.util.Objects;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -61,7 +62,19 @@ public class JwtAuthenticationController {
 	
 	@RequestMapping(value = "/register", method = RequestMethod.POST)
 	public ResponseEntity<?> saveUser(@RequestBody UserDTO user) throws Exception {
-		return ResponseEntity.ok(userDetailsService.save(user));
+		try {
+			if(user.getPassword().isEmpty() || user.getUsername().isEmpty()) {
+				return new ResponseEntity<>("Username and password are not empty", HttpStatus.INTERNAL_SERVER_ERROR);
+			}
+			if(userDetailsService.save(user) == null) {
+				return new ResponseEntity<>(String.format("Can't register , username %s is existed",user.getUsername()), HttpStatus.OK);
+			}else {
+				return new ResponseEntity<>(String.format("Username %s is register successfull",user.getUsername()), HttpStatus.OK);
+			}
+		}catch (Exception e) {
+			return new ResponseEntity<>(e, HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+		
 	}
 
 }

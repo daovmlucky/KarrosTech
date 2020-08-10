@@ -21,3 +21,18 @@ This is all you have right now:
 - A passionate heart, if you don't like the given mock-up files, feel free to change and show your CEO a better version
 - Your team is a big fan of "Spring IO" tech stack, so they prefers you use Sprint Boot as a starting point
 - An in-memory database is enough for this moment (H2)
+
+
+## Guideline
+
+### 1.Setup run the project
+- Execute script resource/gps_traffic.sql (The project will be connected to mysql database)
+- Import resource/Test_API_GPS.postman_collection.json to post main for testing api . We provide 6 endpoint (Register,Login,uploadFile,getGPSTracks,getTrackById,Logout)
+	
+### 2.System Diagram
+
+[System diagram](https://drive.google.com/file/d/1XjHuJe_AQDyanXiL6PBRwrXIEvRwkMIr/view)
+
+### 3.Workflow Diagram
+
+[Workflow diagram](https://drive.google.com/file/d/1xtDsjla7xNChc4AOzy4Oz-11yp-KCGr-/view)

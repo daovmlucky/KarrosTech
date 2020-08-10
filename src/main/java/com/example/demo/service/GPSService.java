@@ -1,104 +1,95 @@
 package com.example.demo.service;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
+import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.List;
 
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.Marshaller;
-import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
-
 import com.example.demo.dao.GPSDao;
 import com.example.demo.dao.UserDao;
+import com.example.demo.domain.GPS;
 import com.example.demo.domain.User;
-import com.example.demo.dto.AuthorDTO;
-import com.example.demo.dto.BoundDTO;
-
-import com.example.demo.dto.LinkDTO;
-import com.example.demo.dto.MetadataDTO;
-import com.example.demo.dto.MovingAverage;
-import com.example.demo.dto.TimeHolder;
-import com.example.demo.dto.TrackInfoDto;
-import com.example.demo.dto.WayPointDTO;
+import com.example.demo.dto.GPSDTO;
 import com.example.demo.utility.GPXParserUtility;
 import com.example.demo.utility.Util;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.hs.gpxparser.GPXParser;
 import com.hs.gpxparser.modal.GPX;
-import com.hs.gpxparser.modal.Link;
-import com.hs.gpxparser.modal.Metadata;
-import com.hs.gpxparser.modal.Person;
-import com.hs.gpxparser.modal.Track;
-import com.hs.gpxparser.modal.TrackSegment;
 import com.hs.gpxparser.modal.Waypoint;
-import com.hs.gpxparser.type.Fix;
-
-
-
 
 
 @Service
-public class GPSService implements IGPSService{
+public class GPSService {
 	
 	private static final Logger logger = LoggerFactory.getLogger(GPSService.class);
-    private static final DecimalFormat twoDForm = new DecimalFormat("#.##");
     private final static SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
-	private ObjectMapper mapper = new ObjectMapper(); 
-	
 	@Autowired
 	private UserDao userDao;
 	
 	@Autowired
 	private GPSDao gpsDao;
 	
-	@Override
-	public void saveGPS(String username, ByteArrayInputStream in) {
+    @Autowired
+    CacheManager cacheManager;
+    
+    @Autowired
+    AmazonClient amazonClient;
+	
+	
+    @Caching(evict = {
+            @CacheEvict(value = "findAllCache", allEntries = true),
+            @CacheEvict(value = "findByIdCache", allEntries = true)})
+	public boolean saveGPS(String username, ByteArrayInputStream in, String path, String name) {
 		try {
 			User user = userDao.findByUsername(username);
-
-			//GPXParser p = new GPXParser();
 			GPX gpx = GPXParserUtility.parseGPX(in);
-			
 			if(gpx != null) {
-				
-				Pair<Date, Date> startEndDate = parseStartDateAndEndDate(gpx);
-				
 				List<Waypoint> lstWayPoints = new ArrayList<>();
 				gpx.getTracks().stream().forEach(track -> {
 					track.getTrackSegments().forEach(trackSegMent ->{
 						lstWayPoints.addAll(trackSegMent.getWaypoints());
 					});
 				});
-		        
-				TrackInfoDto trackInfoDto = parseTrackInfo(lstWayPoints,startEndDate);
-		        TimeHolder timeHolder = TimeComputer.generateTimes(lstWayPoints);
-
+				
+	        
+				GPSDTO trackInfoDto = parseTrackInfo(lstWayPoints);
+				GPS gpsEntity = convertGPSDtoToGPS(trackInfoDto,path,name,user);
+				gpsDao.save(gpsEntity);
+				return true;
 			}
-
-
+			amazonClient.deleteFileFromS3Bucket(path);
+			return false;
 		}catch (Exception e) {
 			logger.error("Failed to save gps,exception ",e);
+			amazonClient.deleteFileFromS3Bucket(path);
+			return false;
 		}
 	}
 	
-	private TrackInfoDto parseTrackInfo(List<Waypoint> points,Pair<Date, Date> startEndDate) {
-		TrackInfoDto trackInfoDto = new TrackInfoDto();
+	@Cacheable(cacheNames = "findAllCache")
+	public List<GPS> getlatestTrack(){
+		return gpsDao.getLatestGPS();
+	}
+	
+	@Cacheable(cacheNames = "findByIdCache")
+	public GPS findById(Long id) {
+		return gpsDao.findOne(id);
+	}
+	
+	private GPSDTO parseTrackInfo(List<Waypoint> points) {
+		
 		Waypoint last = null;
         double totalDist = 0.0;
         double totalTime = 0.0;
@@ -126,10 +117,13 @@ public class GPSService implements IGPSService{
         	
             if(last != null){
             	double dist = Util.distVincentY(point.getLongitude(), point.getLatitude(), last.getLongitude(), last.getLatitude());
-                double time = (point.getTime().getTime()-last.getTime().getTime())/1000;
+                double time = ((point.getTime() == null ? 0 : point.getTime().getTime()) - (last.getTime() == null ? 0 :last.getTime().getTime()))/1000;
                 double distEle = point.getElevation() -last.getElevation();
                 double dist3d = Math.sqrt(Math.pow(dist,2)+Math.pow(distEle,2));
-                double m = (((totalDist + dist3d) - totalDist)/((totalTime + time) - totalTime)) * 3.6;
+                double m = 0;
+                if(time != 0) {
+                	m = (((totalDist + dist3d) - totalDist)/((totalTime + time) - totalTime)) * 3.6;
+                }
                 
                 total3dDist+=dist3d;
                 total2dDist+=dist;
@@ -142,10 +136,12 @@ public class GPSService implements IGPSService{
                     count++;
                     movingDist += dist;
                     
-                    double curSpeed = (dist/time) * 3.6;
-                    
-                    if(curSpeed > maxSpeed) {
-                    	maxSpeed = curSpeed;
+                    if(time != 0) {
+	                    double curSpeed = (dist/time) * 3.6;
+	                    
+	                    if(curSpeed > maxSpeed) {
+	                    	maxSpeed = curSpeed;
+	                    }
                     }
                     
                     if(distEle > 0.0){
@@ -161,20 +157,30 @@ public class GPSService implements IGPSService{
             last = point;
         }
         
-        double totalSpeed = (totalDist/totalTime)*3.6;
+        return calculateTrackInfo(totalDist,totalTime,movingDist,activeTime,count,maxEle,minEle,totalUp,totalDown,total3dDist,total2dDist,maxSpeed,stopTime,points);
+	}
+	
+	private GPSDTO calculateTrackInfo(double totalDist, double totalTime, double movingDist, double activeTime,
+			int count, double maxEle, double minEle, double totalUp, double totalDown, double total3dDist,
+			double total2dDist, double maxSpeed, double stopTime, List<Waypoint> points) {
+		GPSDTO trackInfoDto = new GPSDTO();
+		Pair<Date, Date> startEndDate = parseStartDateAndEndDate(points);
+		double totalSpeed = (totalDist/totalTime)*3.6;
         double movingSpeed = (movingDist/activeTime) * 3.6;
         double avgDesti = movingDist / (count / 2);
-        trackInfoDto.setMaxElevation(maxEle);
-        trackInfoDto.setMinElevation(minEle);
-        trackInfoDto.setUpHill(totalUp);
-        trackInfoDto.setDownHill(Math.abs(totalDown));
+        trackInfoDto.setMaxElevation(new BigDecimal(maxEle));
+        trackInfoDto.setMinElevation(new BigDecimal(minEle));
+        trackInfoDto.setUpHill(new BigDecimal(totalUp));
+        trackInfoDto.setDownHill(new BigDecimal(Math.abs(totalDown)));
         trackInfoDto.setPointNo(points.size());
-        trackInfoDto.setTotalSpeed(totalSpeed);
-        trackInfoDto.setTotal2dDist((total2dDist/1000));
-        trackInfoDto.setTotal3dDist((total3dDist/1000));
-        trackInfoDto.setStartTime(dateFormat.format(startEndDate.getFirst()));
-        trackInfoDto.setEndTime(dateFormat.format(startEndDate.getSecond()));
-        trackInfoDto.setMaxSpeed(maxSpeed * 3.6);
+        trackInfoDto.setTotalSpeed(new BigDecimal(totalSpeed));
+        trackInfoDto.setTotal2dDist(new BigDecimal(total2dDist/1000));
+        trackInfoDto.setTotal3dDist(new BigDecimal(total3dDist/1000));
+        if(startEndDate != null) {
+	        trackInfoDto.setStartTime(dateFormat.format(startEndDate.getFirst()));
+	        trackInfoDto.setEndTime(dateFormat.format(startEndDate.getSecond()));
+        }
+        trackInfoDto.setMaxSpeed(new BigDecimal(maxSpeed * 3.6));
         int hours = (int)Math.round(totalTime) / 3600;
 		int minutes = ((int)Math.round(totalTime)  % 3600) / 60;
 		int seconds = (int)Math.round(totalTime)  % 60;
@@ -187,27 +193,64 @@ public class GPSService implements IGPSService{
 		int minutesStop = ((int)Math.round(stopTime)  % 3600) / 60;
 		int secondsStop = (int)Math.round(stopTime)  % 60;
 		trackInfoDto.setTimeStopped(String.format("%02d:%02d:%02d", hoursStop, minutesStop, secondsStop));
-		trackInfoDto.setMovingSpeed(movingSpeed);
-		trackInfoDto.setAvgDensity(avgDesti);
+		trackInfoDto.setMovingSpeed(new BigDecimal(movingSpeed));
+		trackInfoDto.setAvgDensity(new BigDecimal(avgDesti));
         return trackInfoDto;
 	}
 	
-	private Pair<Date, Date> parseStartDateAndEndDate(GPX gpx){
-		Date startDate = gpx.getTracks().stream().findFirst().get().getTrackSegments().get(0).getWaypoints().get(0).getTime();
+	private GPS convertGPSDtoToGPS(GPSDTO trackInfoDto, String path, String name, User user) {
+		GPS gpsEntity = new GPS();
+		gpsEntity.setName(name);
+		gpsEntity.setAvgDensity(trackInfoDto.getAvgDensity());
+		gpsEntity.setDownHill(trackInfoDto.getDownHill());
+		gpsEntity.setEndTime(trackInfoDto.getEndTime());
+		gpsEntity.setMaxElevation(trackInfoDto.getMaxElevation());
+		gpsEntity.setMaxSpeed(trackInfoDto.getMaxSpeed());
+		gpsEntity.setMinElevation(trackInfoDto.getMinElevation());
+		gpsEntity.setMovingSpeed(trackInfoDto.getMovingSpeed());
+		gpsEntity.setPointNo(trackInfoDto.getPointNo());
+		gpsEntity.setStartTime(trackInfoDto.getStartTime());
+		gpsEntity.setTimeMoving(trackInfoDto.getTimeMoving());
+		gpsEntity.setTimeStopped(trackInfoDto.getTimeStopped());
+		gpsEntity.setTotal2dDist(trackInfoDto.getTotal2dDist());
+		gpsEntity.setTotal3dDist(trackInfoDto.getTotal3dDist());
+		gpsEntity.setTotalSpeed(trackInfoDto.getTotalSpeed());
+		gpsEntity.setTotalTime(trackInfoDto.getTotalTime());
+		gpsEntity.setUpHill(trackInfoDto.getUpHill());
+		gpsEntity.setUrl(path);
+		gpsEntity.setUser(user);
+		return gpsEntity;
+	}
+	
+	private Pair<Date, Date> parseStartDateAndEndDate(List<Waypoint> list){
+		Date startDate = null;
+		Date endDate = null;
+		for(int i = 0; i < list.size(); i++) {
+			if(list.get(i).getTime() != null) {
+				startDate = list.get(i).getTime();
+				break;
+			}
+		}
 		
-		Track[] trackArr = gpx.getTracks().toArray(new Track[gpx.getTracks().size()]);
-		int numTracks = gpx.getTracks().size()-1;
-        int numSegmentsInLastTrack = trackArr[numTracks].getTrackSegments().size()-1;
-        List<Waypoint> lstWayPoints = trackArr[numTracks].getTrackSegments().get(numSegmentsInLastTrack).getWaypoints();
-        int pointNo = lstWayPoints.size();
-        int numPtsInLastSegment = pointNo -1;
-        Date endDate = lstWayPoints.get(numPtsInLastSegment).getTime();
-        
-        Pair<Date, Date> pairStartEndDate = Pair.of(startDate, endDate);
-        
-        return pairStartEndDate;
+		for(int j = list.size() - 1; j > 0; j--) {
+			if(list.get(j).getTime() != null) {
+				endDate = list.get(j).getTime();
+				break;
+			}
+		}
+		
+		if(startDate != null && endDate != null) {
+			Pair<Date, Date> pairStartEndDate = Pair.of(startDate, endDate);
+			return pairStartEndDate;
+		}
+		return null;
 	}
 	
 	
+	public void flushCache() {
+        for (String cacheName : cacheManager.getCacheNames()) {
+            cacheManager.getCache(cacheName).clear();
+        }
+    }
 
 }

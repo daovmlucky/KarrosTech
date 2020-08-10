@@ -13,9 +13,6 @@ import com.example.demo.dao.UserDao;
 import com.example.demo.domain.User;
 import com.example.demo.dto.UserDTO;
 
-
-
-
 @Service
 public class JwtUserDetailsService implements UserDetailsService {
 	
@@ -36,10 +33,15 @@ public class JwtUserDetailsService implements UserDetailsService {
 	}
 	
 	public User save(UserDTO user) {
-		User newUser = new User();
-		newUser.setUsername(user.getUsername());
-		newUser.setPassword(bcryptEncoder.encode(user.getPassword()));
-		return userDao.save(newUser);
+		User currentUser = userDao.findByUsername(user.getUsername());
+		if(currentUser == null) {
+			User newUser = new User();
+			newUser.setUsername(user.getUsername());
+			newUser.setPassword(bcryptEncoder.encode(user.getPassword()));
+			return userDao.save(newUser);
+		}else {
+			return null;
+		}
 	}
 
 }

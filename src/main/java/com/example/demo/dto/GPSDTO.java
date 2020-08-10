@@ -1,122 +1,158 @@
 package com.example.demo.dto;
 
-public class TrackInfoDto {
-	private Double total2dDist;
-	private Double total3dDist;
-	private Double totalSpeed;
-	private Double movingSpeed;
-	private Double maxSpeed;
+import java.math.BigDecimal;
+
+public class GPSDTO {
+	private BigDecimal total2dDist;
+	private BigDecimal total3dDist;
+	private BigDecimal totalSpeed;
+	private BigDecimal movingSpeed;
+	private BigDecimal maxSpeed;
 	private String totalTime;
 	private String timeStopped;
 	private String timeMoving;
 	private String startTime;
 	private String endTime;
 	private Integer pointNo;
-	private Double avgDensity;
-	private Double upHill;
-	private Double downHill;
-	private Double maxElevation;
-	private Double minElevation;
+	private BigDecimal avgDensity;
+	private BigDecimal upHill;
+	private BigDecimal downHill;
+	private BigDecimal maxElevation;
+	private BigDecimal minElevation;
 	
-	public TrackInfoDto() {
+	public GPSDTO() {
 		super();
 	}
-	public Double getTotal2dDist() {
+
+	public BigDecimal getTotal2dDist() {
 		return total2dDist;
 	}
-	public void setTotal2dDist(Double total2dDist) {
+
+	public void setTotal2dDist(BigDecimal total2dDist) {
 		this.total2dDist = total2dDist;
 	}
-	public Double getTotal3dDist() {
+
+	public BigDecimal getTotal3dDist() {
 		return total3dDist;
 	}
-	public void setTotal3dDist(Double total3dDist) {
+
+	public void setTotal3dDist(BigDecimal total3dDist) {
 		this.total3dDist = total3dDist;
 	}
-	public Double getTotalSpeed() {
+
+	public BigDecimal getTotalSpeed() {
 		return totalSpeed;
 	}
-	public void setTotalSpeed(Double totalSpeed) {
+
+	public void setTotalSpeed(BigDecimal totalSpeed) {
 		this.totalSpeed = totalSpeed;
 	}
-	public Double getMovingSpeed() {
+
+	public BigDecimal getMovingSpeed() {
 		return movingSpeed;
 	}
-	public void setMovingSpeed(Double movingSpeed) {
+
+	public void setMovingSpeed(BigDecimal movingSpeed) {
 		this.movingSpeed = movingSpeed;
 	}
-	public Double getMaxSpeed() {
+
+	public BigDecimal getMaxSpeed() {
 		return maxSpeed;
 	}
-	public void setMaxSpeed(Double maxSpeed) {
+
+	public void setMaxSpeed(BigDecimal maxSpeed) {
 		this.maxSpeed = maxSpeed;
 	}
+
 	public String getTotalTime() {
 		return totalTime;
 	}
+
 	public void setTotalTime(String totalTime) {
 		this.totalTime = totalTime;
 	}
+
 	public String getTimeStopped() {
 		return timeStopped;
 	}
+
 	public void setTimeStopped(String timeStopped) {
 		this.timeStopped = timeStopped;
 	}
+
 	public String getTimeMoving() {
 		return timeMoving;
 	}
+
 	public void setTimeMoving(String timeMoving) {
 		this.timeMoving = timeMoving;
 	}
+
 	public String getStartTime() {
 		return startTime;
 	}
+
 	public void setStartTime(String startTime) {
 		this.startTime = startTime;
 	}
+
 	public String getEndTime() {
 		return endTime;
 	}
+
 	public void setEndTime(String endTime) {
 		this.endTime = endTime;
 	}
+
 	public Integer getPointNo() {
 		return pointNo;
 	}
+
 	public void setPointNo(Integer pointNo) {
 		this.pointNo = pointNo;
 	}
-	public Double getAvgDensity() {
+
+	public BigDecimal getAvgDensity() {
 		return avgDensity;
 	}
-	public void setAvgDensity(Double avgDensity) {
+
+	public void setAvgDensity(BigDecimal avgDensity) {
 		this.avgDensity = avgDensity;
 	}
-	public Double getUpHill() {
+
+	public BigDecimal getUpHill() {
 		return upHill;
 	}
-	public void setUpHill(Double upHill) {
+
+	public void setUpHill(BigDecimal upHill) {
 		this.upHill = upHill;
 	}
-	public Double getDownHill() {
+
+	public BigDecimal getDownHill() {
 		return downHill;
 	}
-	public void setDownHill(Double downHill) {
+
+	public void setDownHill(BigDecimal downHill) {
 		this.downHill = downHill;
 	}
-	public Double getMaxElevation() {
+
+	public BigDecimal getMaxElevation() {
 		return maxElevation;
 	}
-	public void setMaxElevation(Double maxElevation) {
+
+	public void setMaxElevation(BigDecimal maxElevation) {
 		this.maxElevation = maxElevation;
 	}
-	public Double getMinElevation() {
+
+	public BigDecimal getMinElevation() {
 		return minElevation;
 	}
-	public void setMinElevation(Double minElevation) {
+
+	public void setMinElevation(BigDecimal minElevation) {
 		this.minElevation = minElevation;
 	}
+
+	
 	
 	
 }
