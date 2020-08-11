@@ -7,7 +7,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +16,10 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 import com.example.demo.dao.GPSDao;
@@ -79,13 +83,31 @@ public class GPSService {
 	}
 	
 	@Cacheable(cacheNames = "findAllCache")
-	public List<GPS> getlatestTrack(){
-		return gpsDao.getLatestGPS();
+	public List<GPS> getlatestTrack(Integer pageNo, Integer pageSize){
+		if(pageNo != null) {
+			if(pageNo < 0) {
+				return new ArrayList<GPS>();
+			}
+			Pageable paging = PageRequest.of(pageNo, pageSize, Sort.by("creationDate").descending());
+			Page<GPS> pagedResult = gpsDao.findAll(paging); 
+		    if(pagedResult.hasContent()) {
+	            return pagedResult.getContent();
+	        } else {
+	            return new ArrayList<GPS>();
+	        }
+		}else {
+			return gpsDao.getLatestGPS();
+		}
 	}
 	
 	@Cacheable(cacheNames = "findByIdCache")
 	public GPS findById(Long id) {
-		return gpsDao.findOne(id);
+		Optional<GPS> optionalGps = gpsDao.findById(id);
+		if(optionalGps.isPresent()) {
+			return optionalGps.get();
+		}else {
+			return null;
+		}
 	}
 	
 	private GPSDTO parseTrackInfo(List<Waypoint> points) {

@@ -72,9 +72,9 @@ public class ApiController {
     public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file, @RequestParam("name") String name) {
 		ObjectNode jsonResponse = JsonResponse.getDefaultResponse();
 		try {
-			String path = this.amazonClient.uploadFile(file);
-			String username = SecurityContextHolder.getContext().getAuthentication().getName();
 	    	if(contentTypes.contains(file.getContentType())) {
+	    		String path = this.amazonClient.uploadFile(file);
+				String username = SecurityContextHolder.getContext().getAuthentication().getName();
 	    		ByteArrayInputStream stream = new ByteArrayInputStream(file.getBytes());
 	    		if(gpsService.saveGPS(username, stream, path,name)) {
 	    			jsonResponse.put(JsonResponse.KEY_MESSAGE, "Successful to upload file");
@@ -84,23 +84,24 @@ public class ApiController {
 	    		}
 	    	}else {
 	    		jsonResponse.put(JsonResponse.KEY_ERROR_MESSAGE, "Only upload file (*.gpx)");
-	            return new ResponseEntity<>(jsonResponse,HttpStatus.NO_CONTENT);
+	            return new ResponseEntity<>(jsonResponse,HttpStatus.INTERNAL_SERVER_ERROR);
 	    	}
 		}catch (Exception e) {
 			logger.error("Failed to uploead file,exception: ",e);
-			return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+			return new ResponseEntity<>(e, HttpStatus.INTERNAL_SERVER_ERROR);
 		}
 		
 	}
 	
     @RequestMapping(value = "/latestTrack", method = RequestMethod.GET,produces = { MediaType.APPLICATION_JSON_VALUE})
-    public ResponseEntity<ObjectNode> getlatestTrackGPS() {
+    public ResponseEntity<ObjectNode> getlatestTrackGPS(@RequestParam("pageNo") Integer pageNo,@RequestParam(defaultValue = "5") Integer pageSize) {
     	try {
-	        List<GPS> allGPS = gpsService.getlatestTrack();
+    		ObjectNode dataObject = JsonNodeFactory.instance.objectNode();
+	        List<GPS> allGPS = gpsService.getlatestTrack(pageNo,pageSize);
 	        if (allGPS.isEmpty()) {
-	        	return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+	        	return new ResponseEntity<>(dataObject,HttpStatus.OK);
 	        }
-	        ObjectNode dataObject = JsonNodeFactory.instance.objectNode();
+	        
 	        ArrayNode gpsArray = JsonNodeFactory.instance.arrayNode();
 	        for (GPS gps : allGPS) {
 	        	ObjectNode gpsObj = JsonNodeFactory.instance.objectNode();
@@ -127,7 +128,9 @@ public class ApiController {
     	try {
 	    	GPS gpsData = gpsService.findById(id);
 	    	if(gpsData == null) {
-	    		return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+	    		ObjectNode dataObject = JsonNodeFactory.instance.objectNode();
+	    		dataObject.put(JsonResponse.KEY_MESSAGE, "Not found track");
+	    		return new ResponseEntity<>(dataObject,HttpStatus.NOT_FOUND);
 	    	}else {
 	    		ObjectNode dataObject = buildTrackDetail(gpsData);
 	    		return new ResponseEntity<>(dataObject, HttpStatus.OK);
